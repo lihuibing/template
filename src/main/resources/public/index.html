@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>代码生成</title>
+    <meta charset="UTF-8">
+    <!-- import CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+</head>
+<body>
+    <div id="app">
+        <el-card class="box-card">
+            <el-form ref="form" :model="form" label-width="120px">
+                <el-form-item label="JDBC连接串">
+                    <el-input v-model="form.jdbcUrl"></el-input>
+                </el-form-item>
+                <el-form-item label="数据库用户名">
+                    <el-input v-model="form.username"></el-input>
+                </el-form-item>
+                <el-form-item label="数据库密码">
+                    <el-input v-model="form.password"></el-input>
+                </el-form-item>
+                <el-form-item label="数据库驱动类">
+                    <el-input v-model="form.driverClassName"></el-input>
+                </el-form-item>
+                <el-form-item>
+                    <el-button type="primary" @click="onSubmit">获取表</el-button>
+                </el-form-item>
+            </el-form>
+            <el-table
+                    :data="data"
+                    stripe
+                    style="width: 100%">
+                <el-table-column
+                        prop="tableName"
+                        label="表名">
+                </el-table-column>
+                <el-table-column
+                        label="操作">
+                    <template slot-scope="scope">
+                        <el-button @click="handleClick(scope.row)" type="text" size="small">生成</el-button>
+                    </template>
+                </el-table-column>
+            </el-table>
+        </el-card>
+
+        <el-dialog title="生成信息" :visible.sync="dialogFormVisible">
+            <el-form :model="genForm">
+                <el-form-item label="作者" :label-width="formLabelWidth">
+                    <el-input v-model="genForm.authorName" autocomplete="off"></el-input>
+                </el-form-item>
+                <el-form-item label="包名" :label-width="formLabelWidth">
+                    <el-input v-model="genForm.packageName" autocomplete="off"></el-input>
+                </el-form-item>
+            </el-form>
+            <div slot="footer" class="dialog-footer">
+                <el-button @click="dialogFormVisible = false">取 消</el-button>
+                <el-button type="primary" @click="generate">确 定</el-button>
+            </div>
+        </el-dialog>
+    </div>
+</body>
+
+<script src="//cdn.staticfile.org/jquery/3.3.1/jquery.min.js"></script>
+<!-- import Vue before Element -->
+<script src="https://unpkg.com/vue/dist/vue.js"></script>
+<!-- import JavaScript -->
+<script src="https://unpkg.com/element-ui/lib/index.js"></script>
+<script>
+    new Vue({
+        el:'#app',
+        data:function(){
+            return {
+                form:{
+                    jdbcUrl:'',
+                    username:'',
+                    password:'',
+                    driverClassName:'com.mysql.cj.jdbc.Driver'
+                },
+                genForm:{
+                    authorName:'',
+                    packageName:''
+                },
+                formLabelWidth:'120px',
+                data:[],
+                dialogFormVisible:false,
+                currentRow:{}
+            }
+        },
+        methods:{
+            onSubmit:function () {
+                var loading = this.$loading({
+                    lock: true,
+                    text: 'Loading',
+                    spinner: 'el-icon-loading',
+                    background: 'rgba(0, 0, 0, 0.7)'
+                });
+                var json = JSON.stringify(this.form);
+                $.ajax({
+                    url:'allTables',
+                    type:'POST',
+                    data:json,
+                    headers:{'Content-Type':'application/json;charset=utf8'},
+                    dataType: "json",
+                    success:function (data) {
+                        this.data = data;
+                        this.$nextTick(function(){
+                            loading.close();
+                        });
+                    }.bind(this)
+                })
+            },
+            handleClick:function (row) {
+                this.currentRow = row;
+                this.dialogFormVisible = true;
+                console.log(row)
+            },
+            generate:function () {
+                var _this = this;
+                var url = 'genCode/?tableSql=' + _this.currentRow.tableDesc + '&packageName=' + _this.genForm.packageName + '&authorName=' + _this.genForm.authorName ;
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', encodeURI(url), true);        // 也可以使用POST方式，根据接口
+                xhr.responseType = "blob";    // 返回类型blob
+                // 定义请求完成的处理函数，请求前也可以增加加载框/禁用下载按钮逻辑
+                xhr.onload = function () {
+                    // 请求完成
+                    if (this.status === 200) {
+                        // 返回200
+                        var blob = this.response;
+                        var reader = new FileReader();
+                        reader.readAsDataURL(blob);    // 转换为base64，可以直接放入a表情href
+                        reader.onload = function (e) {
+                            // 转换完成，创建一个a标签用于下载
+                            var a = document.createElement('a');
+                            a.download = 'code.zip';
+                            a.href = e.target.result;
+                            $("body").append(a);    // 修复firefox中无法触发click
+                            a.click();
+                            $(a).remove();
+                        }
+                    }
+                };
+                // 发送ajax请求
+                xhr.send()
+            }
+        }
+    })
+</script>
+</html>
